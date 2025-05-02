@@ -1,0 +1,54 @@
+services:
+  bd_tgbot:
+    image: postgres:15-alpine
+    container_name: bd_wb_tgbot
+    environment:
+      - POSTGRES_DB=
+      - POSTGRES_USER=
+      - POSTGRES_PASSWORD=
+    ports:
+      - 5431:5432
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+
+  redis_tgbot:
+    image: redis:latest
+    container_name: redis_wb_tgbot
+    volumes:
+      - ./redis-data:/data
+
+  wb_tgbot:
+    depends_on:
+      - db_wb_tgbot
+    image: wb_tgbot_image
+    build:
+      context: .
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: "0"
+        reservations:
+          cpus: "2.0"
+          memory: "1024M"
+    container_name: wb_tgbot
+    env_file:
+      - .env
+    command: bash -c "alembic upgrade head && gunicorn main_bot:app --worker-class uvicorn.workers.UvicornWorker --bind=0.0.0.0:8000"
+    ports:
+      - 8000:8000
+    restart: on-failure:10
+    volumes:
+      - ./tgbot/storage:/max_wb_tgbot/tgbot/storage
+
+  wb_tgbot_analytics:
+    depends_on:
+      - db_wb_tgbot
+    image: wb_tgbot_image
+    build:
+      context: .
+    container_name: wb_tgbot_analytics
+    env_file:
+      - .env
+    command: bash -c "python main_analytics.py"
+    restart: on-failure:10
